@@ -1,31 +1,18 @@
-Claro, aqui está o seu código com a limpeza de dados do datagrama mal formado aplicada na função `__raw_recv`:
-
-```python
 class CamadaEnlace:
     ignore_checksum = False
 
     def __init__(self, linhas_seriais):
         self.enlaces = {}
         self.callback = None
-        # Constrói um Enlace para cada linha serial
         for ip_outra_ponta, linha_serial in linhas_seriais.items():
             enlace = Enlace(linha_serial)
             self.enlaces[ip_outra_ponta] = enlace
             enlace.registrar_recebedor(self._callback)
 
     def registrar_recebedor(self, callback):
-        """
-        Registra uma função para ser chamada quando dados vierem da camada de enlace
-        """
         self.callback = callback
 
     def enviar(self, datagrama, next_hop):
-        """
-        Envia datagrama para next_hop, onde next_hop é um endereço IPv4
-        fornecido como string (no formato x.y.z.w). A camada de enlace se
-        responsabilizará por encontrar em qual enlace se encontra o next_hop.
-        """
-        # Encontra o Enlace capaz de alcançar next_hop e envia por ele
         self.enlaces[next_hop].enviar(datagrama)
 
     def _callback(self, datagrama):
@@ -43,51 +30,22 @@ class Enlace:
         self.callback = callback
 
     def enviar(self, datagrama):
-        # TODO: Preencha aqui com o código para enviar o datagrama pela linha
-        # serial, fazendo corretamente a delimitação de quadros e o escape de
-        # sequências especiais, de acordo com o protocolo CamadaEnlace (RFC 1055).
-        self.linha_serial.enviar(b"\xc0" + self.escapar_datagrama(datagrama) + b"\xc0")
-        pass
+        datagrama = datagrama.replace(b'\xdb', b'\xdb\xdd')
+        datagrama = datagrama.replace(b'\xc0', b'\xdb\xdc')
+        self.linha_serial.enviar(b'\xc0' + datagrama + b'\xc0')
 
     def __raw_recv(self, dados):
-        # Atualizamos os dados com os dados já guardados no buffer
         dados = self.buffer + dados
-
-        # Dividimos possíveis datagramas misturados pelo separados
-        dados = dados.split(b'\xc0')
-
-        # Guardamos o resíduo no buffer (último elemento do array)
-        self.buffer = dados[-1]
-
-        # Enviamos todos os datagramas completos (menos o último) à camada superior
-        for datagrama in dados[:-1]:
-            # Não enviamos datagramas vazios
-            if datagrama != b"":
+        datagramas = dados.split(b'\xc0')
+        self.buffer = datagramas[-1]
+        for datagrama in datagramas[:-1]:
+            if datagrama:
                 try:
-                    self.callback(self.traduzir_datagrama(datagrama))
+                    datagrama = datagrama.replace(b'\xdb\xdc', b'\xc0')
+                    datagrama = datagrama.replace(b'\xdb\xdd', b'\xdb')
+                    self.callback(datagrama)
                 except:
-                    # Ignoramos exceções
                     import traceback
                     traceback.print_exc()
                 finally:
-                    # Limpamos possíveis pedaços de datagramas
-                    dados = b''
-        pass
-
-    def escapar_datagrama(self, datagrama):
-        # Primeiro escapamos o byte 0xDB que serve para escapar 0xC0
-        datagrama_tratado_1 = datagrama.replace(b"\xdb", b"\xdb\xdd")
-
-        # Depois escapamos o byte 0xC0 dentro do datagrama para não haver ambiguidade
-        datagrama_tratado_final = datagrama_tratado_1.replace(b"\xc0", b"\xdb\xdc")
-
-        return datagrama_tratado_final
-    
-    def traduzir_datagrama(self, datagrama):
-        # Primeiro extraímos o byte especial 0xC0 escapado
-        datagrama_traduzido_1 = datagrama.replace(b"\xdb\xdc", b"\xc0")
-
-        # Depois extraímos o byte 0xDB escapado
-        datagrama_traduzido_final = datagrama_traduzido_1.replace(b"\xdb\xdd", b"\xdb")
-
-        return datagrama_traduzido_final
+                    datagrama = b''
