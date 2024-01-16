@@ -1,3 +1,6 @@
+Claro, aqui está o seu código com a limpeza de dados do datagrama mal formado aplicada na função `__raw_recv`:
+
+```python
 class CamadaEnlace:
     ignore_checksum = False
 
@@ -47,14 +50,6 @@ class Enlace:
         pass
 
     def __raw_recv(self, dados):
-        # TODO: Preencha aqui com o código para receber dados da linha serial.
-        # Trate corretamente as sequências de escape. Quando ler um quadro
-        # completo, repasse o datagrama contido nesse quadro para a camada
-        # superior chamando self.callback. Cuidado pois o argumento dados pode
-        # vir quebrado de várias formas diferentes - por exemplo, podem vir
-        # apenas pedaços de um quadro, ou um pedaço de quadro seguido de um
-        # pedaço de outro, ou vários quadros de uma vez só.
-
         # Atualizamos os dados com os dados já guardados no buffer
         dados = self.buffer + dados
 
@@ -73,18 +68,13 @@ class Enlace:
                 except:
                     # Ignoramos exceções
                     import traceback
-
                     traceback.print_exc()
-
                 finally:
                     # Limpamos possíveis pedaços de datagramas
                     dados = b''
-
-
         pass
 
     def escapar_datagrama(self, datagrama):
-        
         # Primeiro escapamos o byte 0xDB que serve para escapar 0xC0
         datagrama_tratado_1 = datagrama.replace(b"\xdb", b"\xdb\xdd")
 
@@ -94,7 +84,6 @@ class Enlace:
         return datagrama_tratado_final
     
     def traduzir_datagrama(self, datagrama):
-
         # Primeiro extraímos o byte especial 0xC0 escapado
         datagrama_traduzido_1 = datagrama.replace(b"\xdb\xdc", b"\xc0")
 
